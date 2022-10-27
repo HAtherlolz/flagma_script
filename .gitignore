@@ -9,6 +9,7 @@ __pycache__/
 .coverage
 .5letka
 locustfile.py
+./excel/
 
 *.pyc
 .letka-media-496f6512be2c.json
