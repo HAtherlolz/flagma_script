@@ -21,9 +21,9 @@ from settings import (
 
 
 class FlagmaParser:
-    links_iteration = 0
+    links_iteration = 1
     row_iteration = 1
-    file_name = 'flagma_dataset.xls'
+    file_name = 'flagma_dataset_2.xls'
     requests.packages.urllib3.disable_warnings()
     session = requests.Session()
     headers = {
@@ -83,15 +83,22 @@ class FlagmaParser:
             price_final = 'Цена по запросу'
         description = self.replace_chars(soup.find('div', id='description').text.strip())
         try:
-            contact_name = etree.HTML(str(soup)).xpath('//div[@class="user-name"]')[0].text.strip()
-        except:
-            contact_name = etree.HTML(str(soup)).xpath('//div[@class="user-name"]/span')[0].text.strip()
+            try:
+                contact_name = etree.HTML(str(soup)).xpath('//div[@class="user-name"]')[0].text.strip()
+            except:
+                contact_name = etree.HTML(str(soup)).xpath('//div[@class="user-name"]/span')[0].text.strip()
+        except AttributeError:
+            contact_name = '<Не Вказано>'
         company_info = etree.HTML(str(soup)).xpath("//div[@class='contacts-block']//div[@class='company-info']//span")[
             0].text.strip()
         company_geo = etree.HTML(str(soup)).xpath("//div[@class='contacts-block']//div[@class='company-info']//span")[
             1].text.strip().split(',')[0]
         photo_list = self.save_photo(soup.select('.card-m .small-photos-block img'))
         phone_list = self.get_phones(soup.select('a.tel'))
+        try:
+            temp = phone_list[0]
+        except IndexError:
+            return
 
         regions_dict = REGION_DICT
         names_list = NAME_LIST
@@ -107,7 +114,7 @@ class FlagmaParser:
                 price_final, type_choices, money_value_models)
 
             phone = '+38' + str(phone_list[0])
-            description = description + '\n' + "Це оголошення було взято з сайту flagma.ua"
+            # description = description + '\n' + "Це оголошення було взято з сайту flagma.ua"
             self.write_data_to_excel(
                 file_name=self.file_name,
                 iter=self.row_iteration,
@@ -132,14 +139,17 @@ class FlagmaParser:
                 description=description,
                 services=None,
             )
-            self.row_iteration += 1
 
     def read_adverts_file(self, iter: int, row_iteration: int, link_list: list, category: str) -> None:
         for link in link_list:
             time.sleep(random.randint(1, 2))
             print(f'------------------ Iteration №{iter} ------------------')
-            self.parse_advert(url=link.strip(), category=category)
-            iter += 1
+            try:
+                self.parse_advert(url=link.strip(), category=category)
+                iter += 1
+                self.row_iteration += 1
+            except BaseException as e:
+                print('Error', e)
 
     def get_user_names(self, contact_name: str, names_list: list, last_name_list: list) -> tuple:
         try:
@@ -158,8 +168,10 @@ class FlagmaParser:
                 min_price, money_value_flagma, type_choice_flagma = price_final.split('|')
             except ValueError:
                 min_price, money_value_flagma, type_choice_flagma = 1000, 'UAH', 'PIECE'
-
-            type_choice = type_choices[type_choice_flagma]
+            try:
+                type_choice = type_choices[type_choice_flagma]
+            except KeyError:
+                type_choice = 'PIECE'
             # Money Value
             try:
                 money_value = money_value_models[money_value_flagma]
@@ -183,7 +195,10 @@ class FlagmaParser:
         api_url = f'https://api.api-ninjas.com/v1/geocoding?city={company_geo}&country=Україна'
         response = requests.get(api_url, headers={'X-Api-Key': api_key})
         if response.status_code == requests.codes.ok:
-            res = response.json()[0]
+            try:
+                res = response.json()[0]
+            except IndexError:
+                return ('Україна', 'Київська область', None, None)
             lat = res['latitude']
             lng = res['longitude']
             country = res['country']
